@@ -14,6 +14,7 @@ in my professional field.
 
 ## 現在の取り組み (Current focus)
 🇯🇵 長文読解教材（背景知識・スラッシュリーディング・チャンク訳）の自動生成から着手
+
 🇬🇧 Starting with automated generation of reading material (background
 knowledge, slash-reading, chunk translation)
 
