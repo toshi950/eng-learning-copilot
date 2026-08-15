@@ -3,6 +3,9 @@
 .env.local
 .env.*.local
 
+# Credentials (GCP service account keys etc. — never commit)
+credentials/
+
 # Python
 __pycache__/
 *.py[cod]
