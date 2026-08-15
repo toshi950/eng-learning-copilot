@@ -12,11 +12,27 @@ reading comprehension using real-world material from one's own professional
 domain. A personal project to train listening/reading using first-hand news
 in my professional field.
 
-## 現在の取り組み (Current focus)
-🇯🇵 長文読解教材（背景知識・スラッシュリーディング・チャンク訳）の自動生成から着手
+## 実装済み機能 (Implemented)
 
-🇬🇧 Starting with automated generation of reading material (background
-knowledge, slash-reading, chunk translation)
+### 長文読解教材の生成 / Reading Material Generation
+
+🇯🇵 英語の長文を渡すと、スラッシュリーディング（意味・構文のまとまりごとの分割）と、
+チャンクごとの構文解説・直訳をまとめたMarkdown教材を自動生成する。
+
+🇬🇧 Given an English passage, automatically generates a Markdown study sheet with
+slash-reading (chunked by meaning and syntax) and a chunk-by-chunk grammar
+explanation / literal translation table.
+
+> 💡 当初は記事の背景知識（用語解説等）も同時生成する設計だったが、実際の記事で
+> 試した結果、Web検索を伴わないLLM単体では学習データのカットオフ以降に起きた
+> 事実を誤判定するケースが見つかったため撤回。背景知識生成は、Web検索と組み
+> 合わせる後続フェーズで改めて実装する予定。
+>
+> Originally the design also generated background knowledge (e.g. terminology)
+> for each article, but testing on a real article surfaced cases where the
+> model — without web search — misjudged facts that occurred after its
+> training cutoff. This was rolled back; background knowledge generation will
+> be revisited in a later phase that incorporates web search.
 
 ## 進捗 (Status)
 - [x] 長文読解教材の生成 / Reading material generation
