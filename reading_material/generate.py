@@ -1,8 +1,10 @@
 """長文読解教材の生成（フェーズ1）
 
-英語の長文テキストを受け取り、Claude Opus 5でスラッシュリーディング教材
-（Chunk Reading + 構文読解・意味解析テーブル）を生成し、入力した原文と
-結合して1つのMarkdown文字列として返す。
+英語の長文テキストを受け取り、Claude Opus 5で以下を1回のAPI呼び出しで生成し、
+入力した原文と結合して1つのMarkdown文字列として返す。
+    - 背景知識（記事を読む前提となる知識）
+    - Chunk Reading（スラッシュリーディング）
+    - 構文読解・意味解析テーブル
 
 `READING_MATERIAL_OUTPUT_DIR` 環境変数が設定されている場合、生成結果を
 そのディレクトリに .md ファイルとして保存できる（save_to_output_dir）。
@@ -25,6 +27,10 @@ load_dotenv()
 MODEL = "claude-opus-5"
 MAX_TOKENS = 16000
 
+# LLM出力のうち、この見出しより前が「背景知識」セクション、
+# この見出しから後が「Chunk Reading + 構文読解・意味解析テーブル」セクション。
+_CHUNK_READING_HEADING = "## Chunk Reading"
+
 
 def _get_client() -> Anthropic:
     api_key = os.environ.get("ANTHROPIC_API_KEY")
@@ -36,7 +42,7 @@ def _get_client() -> Anthropic:
 
 
 def call_claude(text: str, *, client: Optional[Anthropic] = None) -> str:
-    """英文テキストから Chunk Reading + 構文読解・意味解析テーブルを生成する。"""
+    """英文テキストから 背景知識 + Chunk Reading + 構文読解・意味解析テーブルを生成する。"""
     client = client or _get_client()
     prompt = build_prompt(text)
 
@@ -51,11 +57,28 @@ def call_claude(text: str, *, client: Optional[Anthropic] = None) -> str:
     return "\n".join(text_blocks).strip()
 
 
+def _split_background_and_chunk_sections(markdown: str) -> tuple[str, str]:
+    """LLM出力を「背景知識セクション」と「Chunk Reading以降セクション」に分割する。
+
+    見出しが見つからない場合（フォーマット崩れ時のフォールバック）は、
+    背景知識側を空文字として全体をChunk Reading側に返す。
+    """
+    idx = markdown.find(_CHUNK_READING_HEADING)
+    if idx == -1:
+        return "", markdown
+    return markdown[:idx].strip(), markdown[idx:].strip()
+
+
 def generate_reading_material(english_text: str, *, client: Optional[Anthropic] = None) -> str:
-    """英語長文テキストを受け取り、本文＋Chunk Reading＋構文解析テーブルを結合したMarkdownを返す。
+    """英語長文テキストを受け取り、背景知識＋本文＋Chunk Reading＋構文解析テーブルを
+    結合したMarkdownを返す。
 
     戻り値のフォーマット:
         # 英語読解教材 - <生成日時>
+
+        ## 背景知識
+
+        ...
 
         ## 本文
 
@@ -71,8 +94,13 @@ def generate_reading_material(english_text: str, *, client: Optional[Anthropic] 
     """
     english_text = english_text.strip()
     analysis = call_claude(english_text, client=client)
+    background, chunk_and_table = _split_background_and_chunk_sections(analysis)
+
     title = f"# 英語読解教材 - {datetime.now().strftime('%Y-%m-%d %H:%M')}"
-    return f"{title}\n\n## 本文\n\n{english_text}\n\n{analysis}\n"
+    body_section = f"## 本文\n\n{english_text}"
+
+    sections = [title, background, body_section, chunk_and_table]
+    return "\n\n".join(section for section in sections if section) + "\n"
 
 
 def _slugify(text: str, *, max_words: int = 6) -> str:
