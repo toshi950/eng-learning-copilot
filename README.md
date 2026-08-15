@@ -19,6 +19,6 @@ in my professional field.
 knowledge, slash-reading, chunk translation)
 
 ## 進捗 (Status)
-- [ ] 長文読解教材の生成 / Reading material generation
+- [x] 長文読解教材の生成 / Reading material generation
 - [ ] （以降のステップは実装が進み次第、README更新で追記 / further steps will be
   added here as they are implemented）
