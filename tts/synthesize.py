@@ -6,9 +6,8 @@
 認証は `GOOGLE_APPLICATION_CREDENTIALS`（サービスアカウントJSONキーのパス、
 .env経由）をクライアントライブラリが自動的に参照する標準環境変数として利用する。
 
-ボイス候補（実装時に聴き比べて確定、内部設計メモ参照）:
-    en-US-Studio-O（女性）
-    en-US-Studio-Q（男性）
+ボイス：en-US-Studio-Q（男性）を採用（2026-08-31、en-US-Studio-Oとの聴き比べで確定。
+内部設計メモ参照）。
 """
 from __future__ import annotations
 
@@ -21,7 +20,7 @@ from google.cloud import texttospeech
 
 load_dotenv()
 
-DEFAULT_VOICE = "en-US-Studio-O"
+DEFAULT_VOICE = "en-US-Studio-Q"
 DEFAULT_LANGUAGE_CODE = "en-US"
 
 
