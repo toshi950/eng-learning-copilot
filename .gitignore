@@ -13,5 +13,8 @@ __pycache__/
 .venv/
 venv/
 
+# Generated audio (TTS output — not committed, regenerable)
+*.mp3
+
 # OS
 .DS_Store
