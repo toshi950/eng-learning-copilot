@@ -3,12 +3,16 @@
 LLMに探索的なWeb検索をさせると、検索結果が文脈に累積したまま内部ターンごとに
 再処理されるため、コストが検索回数に対してほぼ二乗で効く（実測：検索12回で
 入力625Kトークン／1回あたり約$1.5）。そこで「何が起きているか」の発見だけを
-RSSで肩代わりし、LLMには特定済みの記事の取得とレポート執筆だけを担当させる。
+RSSで肩代わりし、LLMには選んだ記事の特定と本文取得だけを担当させる。
 
 Google News RSSを主軸にしているのは、出版社の個別RSSが軒並み終了している
 （PCAOB・IFRS・FASB・IIA・Journal of Accountancy はいずれも404/403）一方で、
 Google News RSSはクエリ単位で安定して取得でき、Google Alertsと同じ仕組みで
 あるため、利用者が自分のアラートを後から追加できるという利点があるため。
+
+フィードは英語のみとしている（本モジュールの出力は英語学習用の記事抜粋であり、
+日本語記事からは抜粋を作れないため）。日本語の情報収集はClaude Code CLI側の
+定期実行に分離した。
 
 個人用のフィード（自分で設定したGoogle Alerts等）は、環境変数
 `SOURCING_EXTRA_FEEDS`（カンマまたは改行区切りのURL）で追加できる。
@@ -27,7 +31,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-RECENT_DAYS = 30
+# 英語学習教材としては記事の鮮度より内容の質が重要なため、窓は広めに取る
+# （30日だと候補が6件程度まで痩せ、選定の余地がなくなる）。
+RECENT_DAYS = 60
 MAX_CANDIDATES = 40
 MAX_SUMMARY_CHARS = 300
 
@@ -48,9 +54,9 @@ DEFAULT_FEEDS: dict[str, str] = {
     "ITガバナンス・IT監査（英）": _google_news(
         "IT general controls OR ITGC OR SOX compliance audit technology risk"
     ),
-    "監査と生成AI（日）": _google_news("監査 生成AI 内部統制", japanese=True),
-    "会計基準（日）": _google_news("会計基準 ASBJ 企業会計", japanese=True),
-    "経理DX・税務（日）": _google_news("経理DX 税務 電子帳簿保存法", japanese=True),
+    "会計・税務実務（英）": _google_news(
+        "corporate tax accounting compliance reporting requirements"
+    ),
 }
 
 
