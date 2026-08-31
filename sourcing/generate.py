@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from typing import Optional
 
 from anthropic import Anthropic
@@ -127,21 +128,50 @@ def _run_with_web_search(
     return text_blocks[-1].strip(), usage
 
 
-def _parse_json_output(raw_text: str) -> dict:
-    """Claudeの出力からJSON部分を抽出してパースする。
+def _extract_json_text(raw_text: str) -> str:
+    """Claudeの出力からJSON本体らしき部分を抜き出す。
 
-    プロンプトでJSONのみ出力するよう指示しているが、念のためコードフェンス
-    (```json ... ```) が付いた場合にも対応する。
+    プロンプトでJSONのみ出力するよう指示しているが、実際には
+    「350語で文の区切りも綺麗。これで確定します。」のような前置きコメントの後に
+    コードフェンス付きJSONが続くことがある（実測）。そのため、
+      1. テキスト中のどこにあってもよいコードフェンス (```json ... ``` / ``` ... ```) を探す
+      2. 見つからなければ、最初の "{" から最後の "}" までを切り出す
+      3. それでも見つからなければ元のテキストをそのまま返す（従来通りjson.loadsに委ねる）
+    の順で試す。
     """
     text = raw_text.strip()
-    if text.startswith("```"):
-        text = text.split("\n", 1)[1] if "\n" in text else ""
-        if text.endswith("```"):
-            text = text.rsplit("```", 1)[0]
-        text = text.strip()
-        if text.lower().startswith("json"):
-            text = text[4:].strip()
-    return json.loads(text)
+
+    fence_match = re.search(r"```(?:json)?\s*\n(.*?)```", text, re.DOTALL | re.IGNORECASE)
+    if fence_match:
+        return fence_match.group(1).strip()
+
+    first_brace = text.find("{")
+    last_brace = text.rfind("}")
+    if first_brace != -1 and last_brace > first_brace:
+        return text[first_brace : last_brace + 1]
+
+    return text
+
+
+def _parse_json_output(raw_text: str) -> dict:
+    """Claudeの出力からJSON部分を抽出してパースする。"""
+    text = _extract_json_text(raw_text)
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError as exc:
+        # デバッグ用に生の出力を保存し、次回このエラーが起きたときに
+        # 何度もAPI課金してまで再現しなくても原因を確認できるようにする。
+        cache_dir = os.path.join(os.path.dirname(__file__), "..", ".cache")
+        os.makedirs(cache_dir, exist_ok=True)
+        dump_path = os.path.join(cache_dir, "last_raw_response_failed.txt")
+        with open(dump_path, "w", encoding="utf-8") as f:
+            f.write(raw_text)
+        snippet = text[:300].replace("\n", "\\n")
+        raise RuntimeError(
+            f"JSON解析に失敗しました: {exc}\n"
+            f"抽出後テキストの先頭300字: {snippet!r}\n"
+            f"生の出力を保存しました: {dump_path}"
+        ) from exc
 
 
 def find_article(*, client: Optional[Anthropic] = None) -> dict:
