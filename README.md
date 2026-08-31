@@ -14,7 +14,7 @@ in my professional field.
 
 ## 実装済み機能 (Implemented)
 
-### 長文読解教材の生成 / Reading Material Generation
+### 1. 長文読解教材の生成 / Reading Material Generation
 
 🇯🇵 英語の長文を渡すと、スラッシュリーディング（意味・構文のまとまりごとの分割）と、
 チャンクごとの構文解説・直訳をまとめたMarkdown教材を自動生成する。
@@ -26,15 +26,61 @@ explanation / literal translation table.
 > 💡 当初は記事の背景知識（用語解説等）も同時生成する設計だったが、実際の記事で
 > 試した結果、Web検索を伴わないLLM単体では学習データのカットオフ以降に起きた
 > 事実を誤判定するケースが見つかったため撤回。背景知識生成は、Web検索と組み
-> 合わせる後続フェーズで改めて実装する予定。
+> 合わせる後続フェーズ（下記3）へ移した。
 >
 > Originally the design also generated background knowledge (e.g. terminology)
 > for each article, but testing on a real article surfaced cases where the
 > model — without web search — misjudged facts that occurred after its
-> training cutoff. This was rolled back; background knowledge generation will
-> be revisited in a later phase that incorporates web search.
+> training cutoff. This was rolled back and moved to the sourcing phase
+> below, where facts can be grounded via search.
+
+### 2. 音声化 / Text-to-Speech
+
+🇯🇵 教材の英文を読み上げ音声（MP3）として出力する。長文ナレーション向けの
+高品質ボイスを採用し、通勤中のリスニング教材として使えるようにしている。
+
+🇬🇧 Renders the English passage as an MP3 using a voice designed for long-form
+narration, so the material doubles as listening practice.
+
+### 3. 専門分野の情報収集 / Domain-Specific Sourcing
+
+🇯🇵 会計監査・内部統制・データ分析といった自分の専門分野に関するRSSフィードから
+記事候補を集め、その中から読む価値のある英語記事を選定して、音読・リスニング用の
+抜粋を出典情報つきで取得する。
+
+🇬🇧 Collects article candidates from RSS feeds covering my professional domain
+(auditing, internal control, data analytics), selects one worth reading, and
+retrieves an excerpt with its source metadata.
+
+> 💡 当初はLLMに探索的なWeb検索をさせていたが、検索結果が文脈に累積して
+> 再処理されるため、実行コストが検索回数に対して急激に増える構造だった。
+> 実測したうえで「記事を見つける工程」をRSS側に移し、LLMには選定と取得だけを
+> 任せる2段構成に作り替えて、1回あたりのコストを約1/4に削減した。
+>
+> The first version let the model search its way to a topic, but search
+> results accumulate in context and get reprocessed, so cost grew sharply
+> with the number of searches. After measuring this, discovery was moved to
+> RSS and the model was left with only selection and retrieval — cutting the
+> per-run cost to roughly a quarter.
+
+### 4. 自動化フロー統合 / Pipeline Integration
+
+🇯🇵 上記1〜3を1コマンドで実行し、記事の選定から読解教材・音声の生成までを
+まとめて行う。出力はノート1本と音声1本の組で、ノート内に音声が埋め込まれるため、
+そのまま「読む・聴く」教材として開ける。
+
+🇬🇧 Runs the three phases above as a single command, producing one note and one
+audio file per run. The audio is embedded in the note, so a run yields a
+ready-to-use reading + listening set.
+
+## 技術スタック (Tech stack)
+
+Python / Anthropic Claude API / Google Cloud Text-to-Speech / RSS (feedparser)
 
 ## 進捗 (Status)
 - [x] 長文読解教材の生成 / Reading material generation
-- [ ] （以降のステップは実装が進み次第、README更新で追記 / further steps will be
-  added here as they are implemented）
+- [x] 音声化 / Text-to-speech
+- [x] 専門分野の情報収集 / Domain-specific sourcing
+- [x] 自動化フロー統合 / Pipeline integration
+- [ ] 未知語の単語帳自動化 / Vocabulary deck automation
+- [ ] 会話フィードバックの拡張 / Conversation feedback extension
