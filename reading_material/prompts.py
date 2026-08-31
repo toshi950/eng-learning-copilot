@@ -6,6 +6,10 @@
 実際の記事で確認されたため。背景知識生成はWeb検索を伴うフェーズ3
 「専門分野の情報収集」側に統合する）。
 背景・設計判断は内部設計メモ（GitHub_LinkedInポートフォリオ戦略.md）を参照。
+
+同期注意：この仕様はClaude Codeスキル `~/.claude/skills/reading-material/SKILL.md`
+（API課金なしで同じ教材を生成するCLI版）と同一内容を保持している。片方だけ変更すると
+CLI経由とAPI経由で生成物が食い違うため、チューニングしたら必ず両方へ反映すること。
 """
 
 READING_MATERIAL_PROMPT_TEMPLATE = """\
