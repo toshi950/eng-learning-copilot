@@ -16,5 +16,8 @@ venv/
 # Generated audio (TTS output — not committed, regenerable)
 *.mp3
 
+# Pipeline cache (last fetched article, for --from-cache)
+.cache/
+
 # OS
 .DS_Store
