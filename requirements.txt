@@ -2,3 +2,7 @@ anthropic>=0.120.0
 python-dotenv>=1.0.0
 google-cloud-texttospeech>=2.16.0
 feedparser>=6.0.0
+
+# フェーズ5（単語帳自動化）
+google-api-python-client>=2.100.0
+requests>=2.31.0

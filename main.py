@@ -3,6 +3,7 @@
 サブコマンド:
     daily    フェーズ3→1→2を通しで実行し、Vaultに「ノート＋音声」を出力する
     reading  英文を渡して読解教材だけを生成する（フェーズ1単体、従来の使い方）
+    vocab    フェーズ5単体：Sheetsの未処理行からAnkiカードを生成・追加する
 
 使い方:
     python main.py daily                  # 通常実行
@@ -13,7 +14,11 @@
     python main.py reading path/to/text.txt
     echo "..." | python main.py reading
 
+    python main.py vocab                  # Sheets→Anki同期
+
 `daily`は課金が発生する（実測で1回あたり約$0.60）。運用頻度の方針は内部設計メモを参照。
+`vocab`はGoogleフォーム／Sheets作成・AnkiConnect導入・.env設定が前提（未実施の場合エラーになる。
+内部設計メモ「フェーズ5」参照）。
 """
 from __future__ import annotations
 
@@ -68,6 +73,18 @@ def cmd_daily(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_vocab(args: argparse.Namespace) -> int:
+    from vocab import sync_vocab
+
+    result = sync_vocab()
+    print(
+        f"完了しました。"
+        f"追加 {result['added']}件 / 重複スキップ {result['skipped_duplicate']}件"
+        f"（未処理 {result['new_rows']}件 / シート総行数 {result['total_rows']}件）"
+    )
+    return 0
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="英語学習教材の生成")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -93,6 +110,11 @@ def main() -> None:
     )
     p_reading.add_argument("file", nargs="?", help="英文ファイル（省略時は標準入力）")
     p_reading.set_defaults(func=cmd_reading)
+
+    p_vocab = subparsers.add_parser(
+        "vocab", help="Sheetsの未処理行からAnkiカードを生成・追加する（フェーズ5）"
+    )
+    p_vocab.set_defaults(func=cmd_vocab)
 
     args = parser.parse_args()
     sys.exit(args.func(args))
