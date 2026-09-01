@@ -9,13 +9,17 @@ Sheets（発見）→ Haiku（カード生成）→ AnkiConnect（追加）の3�
 次回実行時にSheets API問い合わせ済みの行へのLLM再呼び出しを防ぐ（フェーズ4の
 .cache/last_article.json と同じ考え方）。AnkiConnect側の重複チェック
 （同一デッキ内でFront値が同一のノートを弾く）と合わせた二段構え。
+
+Anki連携（add_card/ensure_deck）はフェーズ6の conversation/ とも共有するため
+トップレベルの anki.py に置かれている（2026-09-01昇格。内部設計メモ参照）。
 """
 from __future__ import annotations
 
 import json
 from pathlib import Path
 
-from .anki import add_card, ensure_deck
+from anki import add_card, ensure_deck
+
 from .generate import generate_card
 from .sheets import fetch_rows
 

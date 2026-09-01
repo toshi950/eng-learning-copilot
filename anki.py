@@ -1,8 +1,15 @@
-"""AnkiConnect経由でのノート追加（フェーズ5）
+"""AnkiConnect経由でのノート追加（フェーズ5・フェーズ6共通）
 
 ローカルで起動中のAnki（AnkiConnectアドオン導入済み）に、生成したカード内容を
 直接ノートとして追加する。AnkiConnectはAnki本体にHTTPサーバーを立てる
 アドオンのため、実行時にAnkiが起動している必要がある。
+
+`vocab/`（フェーズ5：読解教材からの未知語）と `conversation/`（フェーズ6：
+Gemini Live等での会話の自分の誤り訂正）の両方が、同一のカードスキーマ
+（word/cloze_sentence/definition_en/gloss_ja + 任意のnote_ja）を経由して
+この薄い共通モジュールを使う。もともと vocab/anki.py にあったが、
+フェーズ6でも同じAnki連携が必要になったため、2026-09-01にトップレベルへ
+昇格した（内部設計メモ参照）。
 
 前提（ユーザー側の事前準備・未実施）：
 1. Ankiで「ツール」→「アドオン」→「アドオンを取得」→ コード 2055492159
@@ -59,29 +66,41 @@ def ensure_deck(deck_name: Optional[str] = None) -> None:
 
 
 def add_card(
-    card: dict, *, deck_name: Optional[str] = None, allow_duplicate: bool = False
+    card: dict,
+    *,
+    deck_name: Optional[str] = None,
+    allow_duplicate: bool = False,
+    extra_tags: Optional[list[str]] = None,
 ) -> Optional[int]:
     """生成済みのカード内容を1件、Ankiにノートとして追加する。
 
     表面＝空所補充文（cloze_sentence）、裏面＝単語＋英語定義＋日本語訳
-    （内部設計メモ「フェーズ5」のカード構成決定に対応）。
+    （内部設計メモ「フェーズ5」のカード構成決定に対応）。`note_ja`が
+    含まれる場合は裏面末尾に追記する（フェーズ6：会話中の誤りを訂正した
+    カードで、何が不自然だったかの一言補足に使う。内部設計メモ「フェーズ6」
+    参照）。
 
     重複判定はAnkiConnect側の仕組み（同一デッキ内でFront値が同一のノートを
-    弾く）に委ねる（内部設計メモの「二段構え」の後段。前段は sync.py の
-    処理済み行キャッシュ）。追加できた場合はノートID、重複等でスキップされた
-    場合は None を返す。
+    弾く）に委ねる（内部設計メモの「二段構え」の後段。前段は各モジュールの
+    sync.py が持つ処理済み行キャッシュ）。追加できた場合はノートID、
+    重複等でスキップされた場合は None を返す。
     """
     deck_name = deck_name or os.environ.get("ANKI_DECK_NAME", DEFAULT_DECK)
 
     front = card["cloze_sentence"]
-    back = f"<b>{card['word']}</b><br>{card['definition_en']}<br>{card['gloss_ja']}"
+    back_parts = [f"<b>{card['word']}</b>", card["definition_en"], card["gloss_ja"]]
+    if card.get("note_ja"):
+        back_parts.append(f"<i>{card['note_ja']}</i>")
+    back = "<br>".join(back_parts)
+
+    tags = ["eng-learning-copilot"] + (extra_tags or [])
 
     note = {
         "deckName": deck_name,
         "modelName": NOTE_TYPE,
         "fields": {"Front": front, "Back": back},
         "options": {"allowDuplicate": allow_duplicate, "duplicateScope": "deck"},
-        "tags": ["eng-learning-copilot"],
+        "tags": tags,
     }
 
     can_add = _request("canAddNotes", notes=[note])

@@ -1,9 +1,10 @@
 """CLI: 英語学習教材の生成。
 
 サブコマンド:
-    daily    フェーズ3→1→2を通しで実行し、Vaultに「ノート＋音声」を出力する
-    reading  英文を渡して読解教材だけを生成する（フェーズ1単体、従来の使い方）
-    vocab    フェーズ5単体：Sheetsの未処理行からAnkiカードを生成・追加する
+    daily         フェーズ3→1→2を通しで実行し、Vaultに「ノート＋音声」を出力する
+    reading       英文を渡して読解教材だけを生成する（フェーズ1単体、従来の使い方）
+    vocab         フェーズ5単体：Sheetsの未処理行からAnkiカードを生成・追加する
+    conversation  フェーズ6単体：対話ログSheetsから改善フレーズを抽出しAnkiに追加する
 
 使い方:
     python main.py daily                  # 通常実行
@@ -14,11 +15,14 @@
     python main.py reading path/to/text.txt
     echo "..." | python main.py reading
 
-    python main.py vocab                  # Sheets→Anki同期
+    python main.py vocab                  # Sheets→Anki同期（フェーズ5）
+    python main.py conversation           # 対話ログSheets→Anki同期（フェーズ6）
 
 `daily`は課金が発生する（実測で1回あたり約$0.60）。運用頻度の方針は内部設計メモを参照。
-`vocab`はGoogleフォーム／Sheets作成・AnkiConnect導入・.env設定が前提（未実施の場合エラーになる。
-内部設計メモ「フェーズ5」参照）。
+`vocab`・`conversation`はGoogleフォーム／Sheets作成・AnkiConnect導入・.env設定が前提
+（未実施の場合エラーになる。内部設計メモ「フェーズ5」「フェーズ6」参照）。
+会話エンジン自体（Gemini Live等）は自作せず、既存の音声会話サービスの書き起こしを
+専用フォームに貼り付ける運用（内部設計メモ「フェーズ6」の方針転換を参照）。
 """
 from __future__ import annotations
 
@@ -85,6 +89,19 @@ def cmd_vocab(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_conversation(args: argparse.Namespace) -> int:
+    from conversation import sync_conversations
+
+    result = sync_conversations()
+    print(
+        f"完了しました。"
+        f"追加 {result['added']}件 / 重複スキップ {result['skipped_duplicate']}件"
+        f"（{result['new_conversations']}件の対話ログから{result['cards_extracted']}件抽出 / "
+        f"シート総対話数 {result['conversations_processed']}件）"
+    )
+    return 0
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="英語学習教材の生成")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -115,6 +132,12 @@ def main() -> None:
         "vocab", help="Sheetsの未処理行からAnkiカードを生成・追加する（フェーズ5）"
     )
     p_vocab.set_defaults(func=cmd_vocab)
+
+    p_conversation = subparsers.add_parser(
+        "conversation",
+        help="対話ログSheetsから改善フレーズを抽出しAnkiに追加する（フェーズ6）",
+    )
+    p_conversation.set_defaults(func=cmd_conversation)
 
     args = parser.parse_args()
     sys.exit(args.func(args))
