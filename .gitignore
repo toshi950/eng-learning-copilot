@@ -21,3 +21,7 @@ venv/
 
 # OS
 .DS_Store
+
+# Local convenience launcher (hardcodes this machine's absolute path — not
+# portable, personal tooling only)
+eng-sync.command

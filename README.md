@@ -99,6 +99,37 @@ English definition, with the Japanese translation kept as a secondary aid.
 > an English definition — encouraging meaning-processing in English rather
 > than relying on translation.
 
+### 6. 会話フィードバックの拡張 / Conversation Feedback Extension
+
+🇯🇵 Gemini Live等の既存の音声対話サービスで行った英会話の書き起こしを貼り付けると、
+学習者自身の発話にあった不自然な表現・文法ミスだけを抽出し、フェーズ5と同じ
+Ankiカードとして自動生成する。対話相手側の表現は対象外とし、自分の誤りだけに
+焦点を当てている。
+
+🇬🇧 Paste the transcript of an English conversation from an existing voice-chat
+service (e.g. Gemini Live), and it extracts only the unnatural phrasing or
+grammar mistakes in the learner's own speech, turning them into the same
+Anki cards as Phase 5. The other party's phrasing is excluded — the focus
+stays on the learner's own errors.
+
+> 💡 当初は会話エンジン自体（リアルタイム音声対話・書き起こし）をNext.js＋
+> OpenAI Realtime APIで自作する設計だった。しかし「安定した既存の音声対話
+> サービス（Gemini Live）をそのまま会話エンジンとして使い、自作するのは
+> 対話後の書き起こしから改善フレーズを抽出するバックエンド処理だけに絞れば
+> よいのでは」という気づきから設計を全面転換。会話エンジンという最も難しく
+> 運用コストのかかる部分の自作を避け、実際に差別化価値のある処理（自分の
+> 誤りの検出・訂正）に開発を集中させた。
+>
+> The original design called for building the conversation engine itself
+> (real-time voice chat and transcription) from scratch with Next.js and the
+> OpenAI Realtime API. That was scrapped in favor of using an existing,
+> stable voice-chat service (Gemini Live) as the conversation engine as-is,
+> narrowing the actual build to just the backend that extracts improvement
+> phrases from the transcript afterward — avoiding the hardest, most
+> costly-to-operate part (the conversation engine) and concentrating effort
+> on the part that actually differentiates the tool (detecting and
+> correcting one's own mistakes).
+
 ## 技術スタック (Tech stack)
 
 Python / Anthropic Claude API / Google Cloud Text-to-Speech / RSS (feedparser) /
@@ -110,4 +141,4 @@ Google Sheets API / Anki (AnkiConnect)
 - [x] 専門分野の情報収集 / Domain-specific sourcing
 - [x] 自動化フロー統合 / Pipeline integration
 - [x] 未知語の単語帳自動化 / Vocabulary deck automation
-- [ ] 会話フィードバックの拡張 / Conversation feedback extension
+- [x] 会話フィードバックの拡張 / Conversation feedback extension
