@@ -20,6 +20,7 @@ from typing import Optional
 
 from dotenv import load_dotenv
 
+from paths import display_path
 from reading_material import generate_reading_material
 from sourcing import find_article
 from tts import synthesize_to_file
@@ -47,7 +48,7 @@ def _output_dir() -> Path:
     if not path.exists():
         # 誤設定に気づかずVault外へ書き込む事故を防ぐため、自動作成せず落とす
         raise RuntimeError(
-            f"出力先が存在しません: {path}\n"
+            f"出力先が存在しません: {display_path(path)}\n"
             ".env の READING_MATERIAL_OUTPUT_DIR を確認してください。"
         )
     return path
@@ -66,7 +67,7 @@ def save_cache(article: dict) -> Path:
 def load_cache() -> dict:
     if not CACHE_PATH.exists():
         raise RuntimeError(
-            f"キャッシュがありません: {CACHE_PATH}\n"
+            f"キャッシュがありません: {display_path(CACHE_PATH)}\n"
             "--from-cache を付けずに実行して、まず記事を取得してください。"
         )
     return json.loads(CACHE_PATH.read_text(encoding="utf-8"))

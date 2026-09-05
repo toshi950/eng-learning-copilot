@@ -29,6 +29,7 @@ from __future__ import annotations
 import argparse
 import sys
 
+from paths import display_path
 from reading_material import generate_reading_material
 from reading_material.generate import save_to_output_dir
 
@@ -54,7 +55,7 @@ def cmd_reading(args: argparse.Namespace) -> int:
 
     saved_path = save_to_output_dir(result, text)
     if saved_path:
-        print(f"---\n保存先: {saved_path}", file=sys.stderr)
+        print(f"---\n保存先: {display_path(saved_path)}", file=sys.stderr)
     return 0
 
 
@@ -71,9 +72,9 @@ def cmd_daily(args: argparse.Namespace) -> int:
 
     result = run(from_cache=args.from_cache, skip_audio=args.skip_audio)
     print("\n完了しました。")
-    print(f"  ノート: {result['note']}")
+    print(f"  ノート: {display_path(result['note'])}")
     if result["audio"]:
-        print(f"  音声  : {result['audio']}")
+        print(f"  音声  : {display_path(result['audio'])}")
     return 0
 
 
