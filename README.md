@@ -73,14 +73,41 @@ retrieves an excerpt with its source metadata.
 audio file per run. The audio is embedded in the note, so a run yields a
 ready-to-use reading + listening set.
 
+### 5. 未知語の単語帳自動化 / Vocabulary Deck Automation
+
+🇯🇵 読解教材を読んでいて出会った未知語やイディオムを、スマホからGoogleフォームに
+単語とその原文（実際に読んだ一文）を入力するだけで、AnkiのSRSカードとして
+自動生成する。カードは原文の空所補充（cloze）＋英語定義を中心に構成し、
+日本語訳は補助的に添えるだけにとどめている。
+
+🇬🇧 Captures unfamiliar words and idioms encountered while reading the study
+material: type the word and the original sentence it appeared in into a
+Google Form from a phone, and it's automatically turned into an Anki
+spaced-repetition card. Cards center on a cloze-deletion sentence plus an
+English definition, with the Japanese translation kept as a secondary aid.
+
+> 💡 当初は二重符号化（dual coding）の観点から、単語ごとに関連画像を添付する
+> 設計だった。しかし公開画像API（Openverse）で実際に専門分野の抽象語彙を
+> 検索したところ、意味的に無関係な画像しかヒットせず実用に耐えないと判明。
+> 画像案を撤回し、代わりに「原文からの空所補充＋英語定義」という、翻訳に
+> 頼らず英語のまま意味処理させる構成に変更した。
+>
+> The design originally attached a related image to each card, based on
+> dual-coding theory. But searching a public image API (Openverse) for
+> abstract domain-specific vocabulary returned only semantically unrelated
+> results, so the image idea was dropped in favor of a cloze sentence plus
+> an English definition — encouraging meaning-processing in English rather
+> than relying on translation.
+
 ## 技術スタック (Tech stack)
 
-Python / Anthropic Claude API / Google Cloud Text-to-Speech / RSS (feedparser)
+Python / Anthropic Claude API / Google Cloud Text-to-Speech / RSS (feedparser) /
+Google Sheets API / Anki (AnkiConnect)
 
 ## 進捗 (Status)
 - [x] 長文読解教材の生成 / Reading material generation
 - [x] 音声化 / Text-to-speech
 - [x] 専門分野の情報収集 / Domain-specific sourcing
 - [x] 自動化フロー統合 / Pipeline integration
-- [ ] 未知語の単語帳自動化 / Vocabulary deck automation
+- [x] 未知語の単語帳自動化 / Vocabulary deck automation
 - [ ] 会話フィードバックの拡張 / Conversation feedback extension
