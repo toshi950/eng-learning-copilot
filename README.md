@@ -1,5 +1,7 @@
 # English Learning Automation (working title)
 
+![demo](docs/demo.gif)
+
 ## 課題 (Problem)
 🇯🇵 多くの英語学習アプリは、音声知覚のトレーニングや定型表現（チャンク）を瞬時に
 引き出す練習には強みがあるが、実務ドメインの一次情報を教材として、聴解・読解
