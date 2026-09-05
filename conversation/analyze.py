@@ -13,12 +13,21 @@ claude-haiku-4-5 なのとは異なる。内部設計メモ参照）。
 出力はフェーズ5（vocab/generate.py）と同一のカードスキーマに正規化する
 ことで、Anki連携（トップレベルの anki.py）をそのまま共有できるようにして
 いる。note_ja には「元の不自然な表現＋何が不自然だったか」を入れる。
+
+書き起こしはGemini Live等のページ全体を選択してコピー&ペーストしたものを
+想定しており、対話と無関係な日本語UIテキスト等のノイズが混入しうる
+（2026-09-05、ユーザー指摘）。このため、プロンプト側でノイズの無視を明示的に
+指示するとともに、LLMにノイズ除去後の対話部分（cleaned_dialogue）も
+出力させ、`.cache/last_conversation_cleaned.txt`に毎回保存する。実際に何が
+「対話」として認識されたか（＝ノイズが正しく除外されたか）を目視確認できる
+ようにするための、検証用の副産物。
 """
 from __future__ import annotations
 
 import json
 import os
 import re
+from pathlib import Path
 from typing import Optional
 
 from anthropic import Anthropic
@@ -30,14 +39,27 @@ MODEL = "claude-opus-5"
 MAX_TOKENS = 4000
 DEFAULT_MAX_PHRASES = 5
 
+# UIノイズ除去後の対話部分を毎回ここに保存する（デバッグ・検証用。
+# 画面全体コピー&ペーストによるノイズ混入の懸念に対応、2026-09-05）。
+CACHE_DIR = Path(__file__).resolve().parent.parent / ".cache"
+CLEANED_DIALOGUE_PATH = CACHE_DIR / "last_conversation_cleaned.txt"
+
 PROMPT_TEMPLATE = """あなたは英語学習者向けの会話コーチです。以下は、学習者が英会話サービス\
 （Gemini Live等）と行った英会話の書き起こし全文です。話者ラベルの付き方は\
 サービスによって異なりますが、文脈から「学習者自身の発話」と「対話相手（AI）の発話」を\
 判別してください。
 
+**注意**：この書き起こしは、対話サービスのページ全体を選択してコピー&ペーストした\
+ものである可能性があります。そのため、実際の対話とは無関係な要素（日本語のメニュー・\
+ボタン名・見出し・操作ログ等のUIテキスト）が混在していることがあります。これらは\
+対話の一部ではないため完全に無視し、実際に交わされた英会話のやり取り部分だけを\
+分析対象にしてください。
+
 【あなたのタスク】
-学習者自身の発話の中から、不自然な表現・文法的な誤り・語彙選択のミスを特定し、\
-それぞれについて自然な英語表現に改善したものをカード化してください。
+1. まず、書き起こし全文からUIノイズを除いた「実際の対話部分」だけを抽出してください。
+2. その対話部分の中から、学習者自身の発話にあった不自然な表現・文法的な誤り・\
+語彙選択のミスを特定し、それぞれについて自然な英語表現に改善したものをカード化\
+してください。
 
 【対象に含めないもの】
 - 対話相手（Gemini等）が使った表現（どれだけ良い表現でも対象外）
@@ -54,6 +76,7 @@ PROMPT_TEMPLATE = """あなたは英語学習者向けの会話コーチです�
 【出力形式】
 以下のキーを持つJSONオブジェクトを1つだけ出力してください（他のテキストは一切含めない）:
 {{
+  "cleaned_dialogue": "上記タスク1で抽出した、UIノイズを除いた実際の対話部分のみのテキスト（学習者・対話相手双方の発話。検証用に出力するもので、この内容自体はAnkiカードにはしない）",
   "cards": [
     {{
       "word": "改善後の自然な表現（英語）",
@@ -121,4 +144,11 @@ def analyze_conversation(
     text_blocks = [block.text for block in message.content if block.type == "text"]
     raw_text = "\n".join(text_blocks).strip()
     result = json.loads(_extract_json_text(raw_text))
+
+    # UIノイズ除去後の対話部分を保存（毎回上書き）。実際に何が「対話」として
+    # 認識され、何がノイズとして除外されたかを目視確認できるようにするため。
+    cleaned_dialogue = result.get("cleaned_dialogue", "")
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    CLEANED_DIALOGUE_PATH.write_text(cleaned_dialogue, encoding="utf-8")
+
     return result.get("cards", [])
