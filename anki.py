@@ -24,6 +24,7 @@ Gemini Live等での会話の自分の誤り訂正）の両方が、同一のカ
 from __future__ import annotations
 
 import os
+import re
 from typing import Optional
 
 import requests
@@ -34,6 +35,29 @@ load_dotenv()
 DEFAULT_URL = "http://127.0.0.1:8765"
 DEFAULT_DECK = "English::Vocab"
 NOTE_TYPE = "Basic"
+
+
+# hint_en に答えが含まれていないかを調べるときに無視する短い語の長さの閾値。
+# 3文字以下の語（in, on, the 等）は一般的な語のため、含まれていても漏えいとは見なさない。
+_MIN_LEAK_TOKEN_LEN = 4
+
+
+def hint_problem(card: dict, word: str) -> Optional[str]:
+    """hint_en が使えない理由を返す（問題なければ None）。
+
+    表面に出す英語の意味ヒントは必須（2026-10-24）。ヒントがないと空欄に入る語が
+    絞れず、正解を再現できない原因になるため。あわせて、ヒントに答えが含まれて
+    いて問題が成立しなくなる場合も弾く。フェーズ5・6で共通に使う。
+    """
+    hint = (card.get("hint_en") or "").strip()
+    if not hint:
+        return "hint_en が空"
+
+    hint_lower = hint.lower()
+    for token in re.findall(r"[A-Za-z']+", word.lower()):
+        if len(token) >= _MIN_LEAK_TOKEN_LEN and token in hint_lower:
+            return f"hint_en に答えの語 '{token}' が含まれている"
+    return None
 
 
 class AnkiConnectError(RuntimeError):
@@ -74,7 +98,8 @@ def add_card(
 ) -> Optional[int]:
     """生成済みのカード内容を1件、Ankiにノートとして追加する。
 
-    表面＝空所補充文（cloze_sentence）、裏面＝単語＋英語定義＋日本語訳
+    表面＝空所補充文（cloze_sentence）＋英語の意味ヒント（hint_en）、
+    裏面＝単語＋英語定義＋日本語訳（＋別解 alt_answers）
     （内部設計メモ「フェーズ5」のカード構成決定に対応）。`note_ja`が
     含まれる場合は裏面末尾に追記する（フェーズ6：会話中の誤りを訂正した
     カードで、何が不自然だったかの一言補足に使う。内部設計メモ「フェーズ6」
@@ -88,7 +113,15 @@ def add_card(
     deck_name = deck_name or os.environ.get("ANKI_DECK_NAME", DEFAULT_DECK)
 
     front = card["cloze_sentence"]
+    # 表面のヒント（2026-10-24）：答えを含まない英語の意味ヒント（hint_en）。正解が1つに
+    # 決まらないカードで、答えを絞るために出す。日本語のヒントは出さない（日本語に
+    # 引っ張られて原義から離れやすくなるため、ユーザー指示）。
+    if card.get("hint_en"):
+        front += f"<br><small>（{card['hint_en']}）</small>"
+
     back_parts = [f"<b>{card['word']}</b>", card["definition_en"], card["gloss_ja"]]
+    if card.get("alt_answers"):
+        back_parts.append("他の言い方：" + " / ".join(card["alt_answers"]))
     if card.get("note_ja"):
         back_parts.append(f"<i>{card['note_ja']}</i>")
     back = "<br>".join(back_parts)

@@ -14,6 +14,11 @@ claude-haiku-4-5 なのとは異なる。内部設計メモ参照）。
 ことで、Anki連携（トップレベルの anki.py）をそのまま共有できるようにして
 いる。note_ja には「元の不自然な表現＋何が不自然だったか」を入れる。
 
+カード設計の変更（2026-10-24）：空欄の答えが節全体になり、正解が1つに決まらない
+カードが多く、間違いと復習の量を押し上げていたため、空欄を誤りの核になる最小の
+チャンク（原則1〜4語）に絞り、英語のヒント（hint_en）と自然な別解（alt_answers）を
+加えた（日本語のヒントは、原義から離れやすいため使わない）。1回あたりの最大件数も5から3に下げた。
+
 書き起こしはGemini Live等のページ全体を選択してコピー&ペーストしたものを
 想定しており、対話と無関係な日本語UIテキスト等のノイズが混入しうる
 （2026-09-05、ユーザー指摘）。このため、プロンプト側でノイズの無視を明示的に
@@ -27,17 +32,22 @@ from __future__ import annotations
 import json
 import os
 import re
+import sys
 from pathlib import Path
 from typing import Optional
 
 from anthropic import Anthropic
 from dotenv import load_dotenv
 
+from anki import hint_problem
+
 load_dotenv()
 
 MODEL = "claude-opus-5"
 MAX_TOKENS = 4000
-DEFAULT_MAX_PHRASES = 5
+# 1回の対話から作る最大カード数。5から3に下げた（2026-10-24）：Ankiの復習の量が
+# 積み上がるのを抑えるため。
+DEFAULT_MAX_PHRASES = 3
 
 # UIノイズ除去後の対話部分を毎回ここに保存する（デバッグ・検証用。
 # 画面全体コピー&ペーストによるノイズ混入の懸念に対応、2026-09-05）。
@@ -66,6 +76,19 @@ PROMPT_TEMPLATE = """あなたは英語学習者向けの会話コーチです�
 - 単純な言い淀み（"um", "uh"程度）や、内容に関係ない相槌
 - 意味は正しく通じており、些細な言い回しの違いに過ぎないもの
 
+【カードの作り方（重要）】
+- 空欄にする対象は、学習者の誤りの核になる「最小のチャンク」とする（原則1〜4語。\
+固定の言い回しでも最大5語まで）。節や文全体を空欄にしない。誤りが文の構造にある場合は、\
+文の枠を残し、核になる語（前置詞・冠詞・時制・助動詞など）だけを空欄にする。
+- cloze_sentence は20語以内、空欄は1つだけ。
+- hint_en に、答えを含まない英語の短いヒントを入れる（平易な英語で12語以内。\
+意味、または誤りの種類。例："to make something better or more impressive"、\
+"the preposition used before a workplace"）。日本語のヒントは入れない。\
+答えの語自体と、その活用形・派生語をヒントに含めない。
+- alt_answers に、同じ空欄に入りうる自然な別解を0〜3個入れる。別解が複数あり得る場合は、\
+文脈かヒントで絞る。それでも絞れない場合は、別解を必ず示す。
+- word は、空欄に入る答えそのもの（核のチャンク）にする。
+
 【件数】
 本質的な誤り・不自然さが見つかった分だけ、最大{max_phrases}件まで。\
 無理に{max_phrases}件に水増ししないでください。該当が少ない、またはゼロでも構いません。
@@ -79,8 +102,10 @@ PROMPT_TEMPLATE = """あなたは英語学習者向けの会話コーチです�
   "cleaned_dialogue": "上記タスク1で抽出した、UIノイズを除いた実際の対話部分のみのテキスト（学習者・対話相手双方の発話。検証用に出力するもので、この内容自体はAnkiカードにはしない）",
   "cards": [
     {{
-      "word": "改善後の自然な表現（英語）",
-      "cloze_sentence": "改善後の表現を含む自然な文を、対象表現の部分だけ ___ に置き換えたもの",
+      "word": "空欄に入る答え（誤りの核になる最小のチャンク、原則1〜4語、英語）",
+      "cloze_sentence": "答えを含む自然な文（20語以内）を、答えの部分だけ ___ に置き換えたもの（空欄は1つ）",
+      "hint_en": "答えを含まない英語の短いヒント（12語以内。意味、または誤りの種類）",
+      "alt_answers": ["同じ空欄に入りうる自然な別解（0〜3個）"],
       "definition_en": "その表現の意味を表す簡潔な英語定義（1文）",
       "gloss_ja": "簡潔な日本語訳（1行）",
       "note_ja": "学習者が実際に言った不自然な表現の引用と、何が不自然だったかの簡潔な説明（日本語）"
@@ -151,4 +176,16 @@ def analyze_conversation(
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     CLEANED_DIALOGUE_PATH.write_text(cleaned_dialogue, encoding="utf-8")
 
-    return result.get("cards", [])
+    # 英語の意味ヒント（hint_en）は必須。欠けている・答えが含まれている場合は、
+    # 英語定義（definition_en）で代用し、それも使えなければそのカードは作らない。
+    cards = []
+    for card in result.get("cards", []):
+        word = card.get("word", "")
+        if hint_problem(card, word) is not None:
+            fallback = {**card, "hint_en": card.get("definition_en", "")}
+            if hint_problem(fallback, word) is not None:
+                print(f"[警告] 英語のヒントを付けられないためカードを除外: {word}", file=sys.stderr)
+                continue
+            card = fallback
+        cards.append(card)
+    return cards

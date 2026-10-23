@@ -78,13 +78,16 @@ ready-to-use reading + listening set.
 🇯🇵 読解教材を読んでいて出会った未知語やイディオムを、スマホからGoogleフォームに
 単語とその原文（実際に読んだ一文）を入力するだけで、AnkiのSRSカードとして
 自動生成する。カードは原文の空所補充（cloze）＋英語定義を中心に構成し、
-日本語訳は補助的に添えるだけにとどめている。
+日本語訳は補助的に添えるだけにとどめている。表面には、答えを含まない
+英語の意味ヒントを必ず付ける。
 
 🇬🇧 Captures unfamiliar words and idioms encountered while reading the study
 material: type the word and the original sentence it appeared in into a
 Google Form from a phone, and it's automatically turned into an Anki
 spaced-repetition card. Cards center on a cloze-deletion sentence plus an
 English definition, with the Japanese translation kept as a secondary aid.
+An English meaning hint that never contains the answer is always shown on
+the front.
 
 > 💡 当初は二重符号化（dual coding）の観点から、単語ごとに関連画像を添付する
 > 設計だった。しかし公開画像API（Openverse）で実際に専門分野の抽象語彙を
@@ -104,13 +107,16 @@ English definition, with the Japanese translation kept as a secondary aid.
 🇯🇵 Gemini Live等の既存の音声対話サービスで行った英会話の書き起こしを貼り付けると、
 学習者自身の発話にあった不自然な表現・文法ミスだけを抽出し、フェーズ5と同じ
 Ankiカードとして自動生成する。対話相手側の表現は対象外とし、自分の誤りだけに
-焦点を当てている。
+焦点を当てている。空欄は誤りの核になる短いチャンクに絞り、英語のヒントと
+自然な別解を添える。
 
 🇬🇧 Paste the transcript of an English conversation from an existing voice-chat
 service (e.g. Gemini Live), and it extracts only the unnatural phrasing or
 grammar mistakes in the learner's own speech, turning them into the same
 Anki cards as Phase 5. The other party's phrasing is excluded — the focus
-stays on the learner's own errors.
+stays on the learner's own errors. The blank is limited to a short chunk at
+the core of the mistake, with a short English hint and acceptable
+alternative answers.
 
 > 💡 当初は会話エンジン自体（リアルタイム音声対話・書き起こし）をNext.js＋
 > OpenAI Realtime APIで自作する設計だった。しかし「安定した既存の音声対話

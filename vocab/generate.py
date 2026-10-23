@@ -14,6 +14,10 @@ claude-opus-5とは異なる）。
 - 単語単体より実文脈での提示が定着率が高いため、Sheets側で転記された原文を
   そのまま使う（LLMによる文脈生成のフォールバックは不要）
 - 穴埋め（cloze deletion）形式が単純な暗記より想起の質を高める
+- 表面には、空所補充文に加えて、答えを含まない英語の意味ヒント（hint_en）を必ず
+  出す（2026-10-24、必須化）。ヒントがないと空欄に入る語が絞れず、正解を再現できない
+  原因になるため（日本語ではなく英語の意味で出すのは、翻訳に頼らず英語のまま
+  意味処理させる上記の設計と揃えるため）
 - 画像は不採用（Openverse APIでの実証検証の結果、対象語彙〈監査・会計等の
   抽象語・専門語が中心〉には機能しないと判断。内部設計メモ参照）
 """
@@ -26,6 +30,8 @@ from typing import Optional
 
 from anthropic import Anthropic
 from dotenv import load_dotenv
+
+from anki import hint_problem
 
 load_dotenv()
 
@@ -44,10 +50,14 @@ JSON形式で1つだけ出力してください。JSON以外のテキスト（�
 {{
   "word": "{word}",
   "cloze_sentence": "原文中の単語/イディオム部分を ___ に置き換えた文（原文の他の部分は変更しない）",
+  "hint_en": "カードの表面に出す、この文脈での意味のヒント（必須）。平易な英語の1文（12語以内）。答えの単語/イディオム自体と、その活用形・派生語を含めないこと",
   "definition_en": "この文脈での意味を表す簡潔な英語定義（1文、平易な英語で）",
   "gloss_ja": "簡潔な日本語訳（1行。直訳ではなく文脈に即した訳）"
 }}
 """
+
+# hint_en の生成・検証を試みる最大回数（初回＋やり直し1回）。
+MAX_ATTEMPTS = 2
 
 
 def _get_client() -> Anthropic:
@@ -87,18 +97,30 @@ def _extract_json_text(raw_text: str) -> str:
 def generate_card(word: str, sentence: str, *, client: Optional[Anthropic] = None) -> dict:
     """単語/イディオムと原文から、Ankiカード用の内容を生成する。
 
-    戻り値: {"word": str, "cloze_sentence": str, "definition_en": str, "gloss_ja": str}
+    戻り値: {"word": str, "cloze_sentence": str, "hint_en": str,
+             "definition_en": str, "gloss_ja": str}
+
+    hint_en（表面に出す英語の意味ヒント）は必須。欠けている、または答えが含まれて
+    いる場合は1回だけやり直し、それでも満たさなければ ValueError を送出する。
     """
     client = client or _get_client()
     prompt = PROMPT_TEMPLATE.format(word=word, sentence=sentence)
 
-    with client.messages.stream(
-        model=MODEL,
-        max_tokens=MAX_TOKENS,
-        messages=[{"role": "user", "content": prompt}],
-    ) as stream:
-        message = stream.get_final_message()
+    last_problem = None
+    for _ in range(MAX_ATTEMPTS):
+        with client.messages.stream(
+            model=MODEL,
+            max_tokens=MAX_TOKENS,
+            messages=[{"role": "user", "content": prompt}],
+        ) as stream:
+            message = stream.get_final_message()
 
-    text_blocks = [block.text for block in message.content if block.type == "text"]
-    raw_text = "\n".join(text_blocks).strip()
-    return json.loads(_extract_json_text(raw_text))
+        text_blocks = [block.text for block in message.content if block.type == "text"]
+        raw_text = "\n".join(text_blocks).strip()
+        card = json.loads(_extract_json_text(raw_text))
+
+        last_problem = hint_problem(card, word)
+        if last_problem is None:
+            return card
+
+    raise ValueError(f"英語の意味ヒントを生成できませんでした（{word}）: {last_problem}")
