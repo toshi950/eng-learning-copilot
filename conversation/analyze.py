@@ -44,7 +44,11 @@ from anki import hint_problem
 load_dotenv()
 
 MODEL = "claude-opus-5"
-MAX_TOKENS = 4000
+# 出力の上限。長い対話では、検証用のcleaned_dialogue（対話全文の写し）だけで4,000
+# トークンを超え、JSONの途中で出力が切れる不具合があったため、16,000に引き上げた
+# （2026-10-24）。あわせて、カード（cards）を先に、cleaned_dialogueを最後に出力させ、
+# 万一途中で切れてもカードは取れるようにしている。
+MAX_TOKENS = 16000
 # 1回の対話から作る最大カード数。復習の量は、ここで絞らず、Ankiの「1日の新規カード数」
 # で調整する（ここで絞るとカードが永久に作られないが、Anki側なら出すペースを遅らせる
 # だけで済むため。2026-10-24に一度3に下げたが、5に戻した）。
@@ -98,9 +102,9 @@ PROMPT_TEMPLATE = """あなたは英語学習者向けの会話コーチです�
 {transcript}
 
 【出力形式】
-以下のキーを持つJSONオブジェクトを1つだけ出力してください（他のテキストは一切含めない）:
+以下のキーを持つJSONオブジェクトを1つだけ出力してください（他のテキストは一切含めない）。\
+**キーの順序は、必ず "cards" を先、"cleaned_dialogue" を最後にしてください。**
 {{
-  "cleaned_dialogue": "上記タスク1で抽出した、UIノイズを除いた実際の対話部分のみのテキスト（学習者・対話相手双方の発話。検証用に出力するもので、この内容自体はAnkiカードにはしない）",
   "cards": [
     {{
       "word": "空欄に入る答え（誤りの核になる最小のチャンク、原則1〜4語、英語）",
@@ -111,7 +115,8 @@ PROMPT_TEMPLATE = """あなたは英語学習者向けの会話コーチです�
       "gloss_ja": "簡潔な日本語訳（1行）",
       "note_ja": "学習者が実際に言った不自然な表現の引用と、何が不自然だったかの簡潔な説明（日本語）"
     }}
-  ]
+  ],
+  "cleaned_dialogue": "上記タスク1で抽出した、UIノイズを除いた実際の対話部分のみのテキスト（学習者・対話相手双方の発話。検証用に出力するもので、この内容自体はAnkiカードにはしない）"
 }}
 """
 
@@ -143,6 +148,41 @@ def _extract_json_text(raw_text: str) -> str:
     return text
 
 
+def _parse_result(raw_text: str, stop_reason: Optional[str]) -> dict:
+    """モデルの出力をJSONとして読み取る。
+
+    出力が上限（max_tokens）で途中で切れた場合でも、cardsが先に出力されていれば
+    カードだけを救出する（cleaned_dialogueは検証用の副産物のため、欠けてもよい）。
+    """
+    try:
+        return json.loads(_extract_json_text(raw_text))
+    except json.JSONDecodeError as exc:
+        if stop_reason != "max_tokens":
+            raise
+
+        marker = raw_text.find('"cleaned_dialogue"')
+        first_brace = raw_text.find("{")
+        if marker == -1 or first_brace == -1 or marker < first_brace:
+            raise RuntimeError(
+                "出力が上限で途中で切れ、カードを取り出せませんでした"
+                "（対話が長すぎる可能性があります。MAX_TOKENSを引き上げるか、"
+                "対話を短くしてください）"
+            ) from exc
+
+        head = raw_text[first_brace:marker].rstrip().rstrip(",")
+        try:
+            result = json.loads(head + "\n}")
+        except json.JSONDecodeError:
+            result = {}
+        if "cards" not in result:
+            raise RuntimeError(
+                "出力が上限で途中で切れ、カードを取り出せませんでした"
+            ) from exc
+        result["cleaned_dialogue"] = "（出力が上限で途中で切れたため、検証用の対話全文は保存していません）"
+        print("[警告] 出力が上限で途中で切れたため、カードのみ取り出しました", file=sys.stderr)
+        return result
+
+
 def analyze_conversation(
     transcript: str,
     *,
@@ -169,7 +209,7 @@ def analyze_conversation(
 
     text_blocks = [block.text for block in message.content if block.type == "text"]
     raw_text = "\n".join(text_blocks).strip()
-    result = json.loads(_extract_json_text(raw_text))
+    result = _parse_result(raw_text, getattr(message, "stop_reason", None))
 
     # UIノイズ除去後の対話部分を保存（毎回上書き）。実際に何が「対話」として
     # 認識され、何がノイズとして除外されたかを目視確認できるようにするため。

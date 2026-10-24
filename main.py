@@ -100,6 +100,9 @@ def cmd_conversation(args: argparse.Namespace) -> int:
         f"（{result['new_conversations']}件の対話ログから{result['cards_extracted']}件抽出 / "
         f"シート総対話数 {result['conversations_processed']}件）"
     )
+    if result["failed"]:
+        print(f"注意：{result['failed']}件の対話ログの分析に失敗しました（次回の実行で再試行されます）。")
+        return 1
     return 0
 
 

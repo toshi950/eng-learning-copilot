@@ -13,6 +13,7 @@ Sheets（対話ログ取得）→ Opus（改善フレーズ抽出）→ AnkiConn
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
 from anki import add_card, ensure_deck
@@ -41,7 +42,7 @@ def sync_conversations() -> dict:
     """未処理の対話ログを分析し、改善フレーズのAnkiカードを生成・追加する。
 
     戻り値: {"added": int, "skipped_duplicate": int, "conversations_processed": int,
-             "new_conversations": int, "cards_extracted": int}
+             "new_conversations": int, "cards_extracted": int, "failed": int}
     """
     rows = fetch_rows()
     processed = _load_processed_rows()
@@ -52,9 +53,18 @@ def sync_conversations() -> dict:
     added = 0
     skipped_duplicate = 0
     cards_extracted = 0
+    failed = 0
 
     for row in new_rows:
-        cards = analyze_conversation(row["transcript"])
+        # 1件の対話ログの失敗（出力の途切れ等）で、残りの処理と、処理済みの記録を
+        # 失わないようにする。失敗した行は処理済みにせず、次回の実行で再試行される。
+        try:
+            cards = analyze_conversation(row["transcript"])
+        except Exception as exc:  # noqa: BLE001
+            failed += 1
+            print(f"[警告] 行{row['row_number']}の分析に失敗しました: {exc}", file=sys.stderr)
+            continue
+
         cards_extracted += len(cards)
 
         for card in cards:
@@ -65,8 +75,7 @@ def sync_conversations() -> dict:
                 skipped_duplicate += 1
 
         processed.add(row["row_number"])
-
-    _save_processed_rows(processed)
+        _save_processed_rows(processed)
 
     return {
         "added": added,
@@ -74,4 +83,5 @@ def sync_conversations() -> dict:
         "conversations_processed": len(rows),
         "new_conversations": len(new_rows),
         "cards_extracted": cards_extracted,
+        "failed": failed,
     }
